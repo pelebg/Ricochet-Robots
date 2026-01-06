@@ -1,567 +1,331 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Ricochet-like v2</title>
-  <style>
-    :root { --cell: 42px; --gap: 2px; }
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 18px; background:#fff; color:#111; }
-    h1 { font-size: 18px; margin: 0 0 10px; }
-    .wrap { display: grid; grid-template-columns: auto 360px; gap: 18px; align-items: start; }
-    #board { display: grid; grid-template-columns: repeat(16, var(--cell)); grid-auto-rows: var(--cell); gap: var(--gap); background:#111; padding: var(--gap); border-radius: 10px; }
-    .cell { position: relative; background: #f7f7f7; border-radius: 6px; }
-    .cell.dark { background:#f0f0f0; }
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ricochet-like</title>
 
-    .wallT::before, .wallR::before, .wallB::before, .wallL::before { content:""; position:absolute; background:#111; }
-    .wallT::before { left:0; right:0; top:-2px; height:6px; border-radius: 6px 6px 0 0; }
-    .wallB::before { left:0; right:0; bottom:-2px; height:6px; border-radius: 0 0 6px 6px; }
-    .wallL::before { top:0; bottom:0; left:-2px; width:6px; border-radius: 6px 0 0 6px; }
-    .wallR::before { top:0; bottom:0; right:-2px; width:6px; border-radius: 0 6px 6px 0; }
+<style>
+/* =======================
+   THEME / VARIABLES
+======================= */
+:root{
+  --bg0:#070A12;
+  --bg1:#0B1024;
+  --stroke: rgba(255,255,255,.14);
+  --text: rgba(255,255,255,.92);
+  --muted: rgba(255,255,255,.65);
 
-    .target {
-      position:absolute; inset: 9px;
-      border: 2px dashed #444; border-radius: 10px;
-      display:flex; align-items:center; justify-content:center;
-      font-size: 12px; font-weight: 800; color:#444;
-      opacity: .9;
-    }
+  --cell: 44px;
+  --gap: 3px;
 
-    .robot {
-      position:absolute; inset: 8px;
-      border-radius: 999px;
-      display:flex; align-items:center; justify-content:center;
-      color:#fff; font-weight: 900; font-size: 12px;
-      box-shadow: 0 6px 16px rgba(0,0,0,.15);
-      cursor: pointer;
-      user-select:none;
-    }
-    .robot.sel { outline: 3px solid #111; outline-offset: 2px; }
+  --shadow: 0 18px 50px rgba(0,0,0,.45);
 
-    .side { border:1px solid #ddd; padding: 12px; border-radius: 12px; background: #fff; }
-    .row { display:flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; align-items:center; }
-    button, input[type="number"] {
-      padding: 8px 10px; border-radius: 10px; border:1px solid #ccc; background:#fafafa;
-      cursor:pointer; font: inherit;
-    }
-    button:hover { background:#f0f0f0; }
-    button:disabled { opacity:.5; cursor:not-allowed; }
-    .kbd { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background:#f2f2f2; border:1px solid #ddd; padding: 2px 6px; border-radius: 7px; }
-    .stat { font-size: 14px; }
-    .hint { font-size: 13px; color:#444; line-height:1.35; }
-    .pill { display:inline-flex; align-items:center; gap:6px; padding: 4px 8px; border:1px solid #ddd; border-radius: 999px; font-size: 13px; }
-    .dot { width: 10px; height:10px; border-radius: 99px; display:inline-block; }
-    .log { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; background:#fafafa; border:1px solid #eee; padding:10px; border-radius:10px; height: 180px; overflow:auto; white-space: pre; }
-    .split { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .ok { color: #0a7a2f; font-weight:700; }
-    .bad { color: #b00020; font-weight:700; }
-  </style>
+  --glowR: 0 0 22px rgba(255,70,70,.45);
+  --glowB: 0 0 22px rgba(80,160,255,.45);
+  --glowG: 0 0 22px rgba(70,220,150,.45);
+  --glowY: 0 0 22px rgba(255,210,90,.45);
+}
+
+/* =======================
+   BASE
+======================= */
+*{ box-sizing:border-box; }
+
+body{
+  margin:0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+  color:var(--text);
+  background:
+    radial-gradient(1200px 800px at 20% 10%, rgba(120,90,255,.25), transparent 55%),
+    radial-gradient(900px 700px at 85% 20%, rgba(0,210,255,.20), transparent 55%),
+    linear-gradient(180deg, var(--bg0), var(--bg1));
+}
+
+.page{
+  max-width:1200px;
+  margin:auto;
+  padding:18px;
+}
+
+h1{
+  margin:0 0 6px;
+  font-size:20px;
+}
+
+.subtitle{
+  font-size:13px;
+  color:var(--muted);
+  margin-bottom:16px;
+}
+
+/* =======================
+   LAYOUT
+======================= */
+.wrap{
+  display:grid;
+  grid-template-columns:auto 360px;
+  gap:16px;
+}
+
+/* =======================
+   BOARD
+======================= */
+#board{
+  display:grid;
+  grid-template-columns:repeat(16,var(--cell));
+  grid-auto-rows:var(--cell);
+  gap:var(--gap);
+  padding:14px;
+  border-radius:18px;
+  background:
+    repeating-linear-gradient(135deg, rgba(255,255,255,.03) 0 2px, transparent 2px 10px),
+    linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+  border:1px solid var(--stroke);
+  box-shadow:var(--shadow);
+}
+
+.cell{
+  position:relative;
+  border-radius:12px;
+  background:
+    radial-gradient(circle at 30% 20%, rgba(255,255,255,.15), rgba(0,0,0,.15) 75%);
+  border:1px solid rgba(255,255,255,.10);
+}
+
+.cell.dark{
+  background:
+    radial-gradient(circle at 30% 20%, rgba(255,255,255,.10), rgba(0,0,0,.20) 80%);
+}
+
+/* WALLS */
+.wallT::before,.wallB::before,.wallL::before,.wallR::before{
+  content:"";
+  position:absolute;
+  background:linear-gradient(180deg, rgba(255,255,255,.25), rgba(0,0,0,.6));
+}
+.wallT::before{top:-3px;left:6px;right:6px;height:8px;border-radius:99px;}
+.wallB::before{bottom:-3px;left:6px;right:6px;height:8px;border-radius:99px;}
+.wallL::before{left:-3px;top:6px;bottom:6px;width:8px;border-radius:99px;}
+.wallR::before{right:-3px;top:6px;bottom:6px;width:8px;border-radius:99px;}
+
+/* TARGET */
+.target{
+  position:absolute;
+  inset:8px;
+  border-radius:12px;
+  border:2px dashed rgba(255,255,255,.55);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:900;
+  background:radial-gradient(circle, rgba(0,255,255,.18), rgba(0,0,0,.20));
+  box-shadow:0 0 25px rgba(0,255,255,.25);
+}
+
+/* ROBOTS */
+.robot{
+  position:absolute;
+  inset:7px;
+  border-radius:999px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:900;
+  color:white;
+  cursor:pointer;
+  box-shadow:
+    0 14px 24px rgba(0,0,0,.45),
+    inset 0 2px 2px rgba(255,255,255,.25),
+    inset 0 -10px 20px rgba(0,0,0,.35);
+}
+
+.robot::after{
+  content:"";
+  position:absolute;
+  inset:6px 8px 16px 8px;
+  border-radius:999px;
+  background:radial-gradient(circle at 30% 30%, rgba(255,255,255,.6), transparent 60%);
+}
+
+.robot.sel{
+  outline:2px solid white;
+  outline-offset:2px;
+}
+
+/* =======================
+   SIDE PANEL
+======================= */
+.side{
+  border-radius:18px;
+  background:rgba(255,255,255,.06);
+  border:1px solid var(--stroke);
+  padding:14px;
+  box-shadow:var(--shadow);
+}
+
+.row{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-bottom:10px;
+}
+
+button{
+  padding:10px 12px;
+  border-radius:14px;
+  border:1px solid rgba(255,255,255,.20);
+  background:linear-gradient(180deg, rgba(255,255,255,.15), rgba(255,255,255,.05));
+  color:white;
+  cursor:pointer;
+}
+
+button:hover{ filter:brightness(1.1); }
+
+.log{
+  font-family:monospace;
+  font-size:12px;
+  background:rgba(0,0,0,.35);
+  border-radius:14px;
+  padding:12px;
+  height:160px;
+  overflow:auto;
+}
+
+/* RESPONSIVE */
+@media(max-width:980px){
+  .wrap{ grid-template-columns:1fr; }
+}
+</style>
 </head>
+
 <body>
-  <h1>Ricochet-like v2 — (mécanique similaire, sans matériel officiel)</h1>
+<div class="page">
+  <h1>Ricochet-like</h1>
+  <div class="subtitle">Jeu de logique inspiré de Ricochet Robots</div>
 
   <div class="wrap">
-    <div id="board" aria-label="Plateau"></div>
+    <div id="board"></div>
 
     <div class="side">
       <div class="row">
-        <span class="pill">Robot : <span id="selName">—</span></span>
-        <span class="pill">Coups : <span id="moves">0</span></span>
-        <span class="pill">Chrono : <span id="clock">00:00</span></span>
+        <button onclick="newTarget()">Nouvelle cible</button>
+        <button onclick="reset()">Reset</button>
       </div>
-
       <div class="row">
-        <button id="newTarget">Nouvelle cible (N)</button>
-        <button id="resetTurn">Reset tour</button>
-        <button id="shuffle">Nouveau layout</button>
+        Coups : <span id="moves">0</span>
       </div>
-
-      <div class="row">
-        <button id="undo" disabled>Undo (Z)</button>
-        <button id="redo" disabled>Redo (Y)</button>
-        <button id="copyLog">Copier log</button>
-      </div>
-
-      <div class="split">
-        <div>
-          <div class="stat">Cible</div>
-          <div id="targetLabel" style="margin-top:6px;">—</div>
-        </div>
-        <div>
-          <div class="stat">Mode “Bid”</div>
-          <div class="row" style="margin:6px 0 0;">
-            <input id="bidInput" type="number" min="1" max="99" placeholder="nb coups" style="width:110px;">
-            <button id="startBid">Démarrer</button>
-          </div>
-          <div class="hint">Annonce, puis joue. Le jeu valide si tu tiens ton nombre.</div>
-          <div id="bidStatus" class="hint" style="margin-top:6px;"></div>
-        </div>
-      </div>
-
-      <div class="row">
-        <button id="timerToggle">Start/Pause chrono</button>
-        <button id="timerReset">Reset chrono</button>
-      </div>
-
-      <div class="row hint">
-        Flèches <span class="kbd">↑</span><span class="kbd">↓</span><span class="kbd">←</span><span class="kbd">→</span> pour faire glisser.
-        Sélection robot : <span class="kbd">1</span><span class="kbd">2</span><span class="kbd">3</span><span class="kbd">4</span>.
-        <span class="kbd">N</span> nouvelle cible, <span class="kbd">R</span> reset tour.
-      </div>
-
-      <div class="row">
-        <div style="flex:1">
-          <div class="stat">Historique</div>
-          <div id="log" class="log"></div>
-        </div>
-      </div>
-
-      <div class="row hint" style="color:#777">
-        Astuce : les meilleurs coups passent souvent par “placer” un robot comme butée pour un autre.
-      </div>
+      <div class="log" id="log"></div>
     </div>
   </div>
+</div>
 
 <script>
-(() => {
-  const W = 16, H = 16;
+/* =======================
+   GAME LOGIC
+======================= */
+const W=16,H=16;
+const board=document.getElementById("board");
+const movesEl=document.getElementById("moves");
+const logEl=document.getElementById("log");
 
-  // Robots
-  const robots = [
-    { id:0, name:"Rouge", short:"R", color:"#d33",   x:1,  y:1  },
-    { id:1, name:"Bleu",  short:"B", color:"#2a6fdb",x:14, y:1  },
-    { id:2, name:"Vert",  short:"V", color:"#2e9b4d",x:1,  y:14 },
-    { id:3, name:"Jaune", short:"J", color:"#d1a300",x:14, y:14 }
-  ];
-  const defaultStarts = robots.map(r => ({x:r.x, y:r.y}));
+let moves=0;
+let selected=0;
 
-  // Walls bitmask per cell: 1=T,2=R,4=B,8=L
-  let walls = Array.from({length: W*H}, () => 0);
+const robots=[
+  {id:0,c:"#e74c3c",x:1,y:1},
+  {id:1,c:"#3498db",x:14,y:1},
+  {id:2,c:"#2ecc71",x:1,y:14},
+  {id:3,c:"#f1c40f",x:14,y:14},
+];
 
-  const idx = (x,y)=> y*W+x;
-  const inBounds = (x,y)=> x>=0 && x<W && y>=0 && y<H;
+let target={x:8,y:8};
 
-  function addWall(x,y,dir){
-    const m = {T:1,R:2,B:4,L:8}[dir];
-    walls[idx(x,y)] |= m;
-    const opp = {T:"B",B:"T",L:"R",R:"L"}[dir];
-    const [nx,ny] = dir==="T"?[x,y-1]:dir==="B"?[x,y+1]:dir==="L"?[x-1,y]:[x+1,y];
-    if(inBounds(nx,ny)){
-      walls[idx(nx,ny)] |= {T:1,R:2,B:4,L:8}[opp];
+function idx(x,y){return y*W+x;}
+
+const walls=Array(W*H).fill(0);
+function wall(x,y,d){
+  const m={T:1,R:2,B:4,L:8}[d];
+  walls[idx(x,y)]|=m;
+}
+
+/* borders */
+for(let i=0;i<W;i++){wall(i,0,"T");wall(i,H-1,"B");}
+for(let i=0;i<H;i++){wall(0,i,"L");wall(W-1,i,"R");}
+
+function render(){
+  board.innerHTML="";
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+    const c=document.createElement("div");
+    c.className="cell"+(((x+y)&1)?" dark":"");
+    const m=walls[idx(x,y)];
+    if(m&1)c.classList.add("wallT");
+    if(m&2)c.classList.add("wallR");
+    if(m&4)c.classList.add("wallB");
+    if(m&8)c.classList.add("wallL");
+
+    if(x===target.x&&y===target.y){
+      const t=document.createElement("div");
+      t.className="target";
+      t.textContent="★";
+      c.appendChild(t);
     }
-  }
 
-  function clearWalls(){
-    walls = Array.from({length: W*H}, () => 0);
-    // Borders
-    for(let x=0;x<W;x++){ addWall(x,0,"T"); addWall(x,H-1,"B"); }
-    for(let y=0;y<H;y++){ addWall(0,y,"L"); addWall(W-1,y,"R"); }
-  }
-
-  // Better-feeling layout: central 2x2 block + "corner-like" wall pairs
-  function generateLayout(seedRand=Math.random){
-    clearWalls();
-
-    // Central 2x2 enclosed block (classic feel)
-    for(let x=7; x<=8; x++){
-      for(let y=7; y<=8; y++){
-        addWall(x,y,"T"); addWall(x,y,"B"); addWall(x,y,"L"); addWall(x,y,"R");
+    robots.forEach(r=>{
+      if(r.x===x&&r.y===y){
+        const d=document.createElement("div");
+        d.className="robot"+(r.id===selected?" sel":"");
+        d.style.background=r.c;
+        d.style.boxShadow+=
+          r.id===0?",var(--glowR)":
+          r.id===1?",var(--glowB)":
+          r.id===2?",var(--glowG)":
+                    ",var(--glowY)";
+        d.textContent=r.id+1;
+        d.onclick=()=>{selected=r.id;render();}
+        c.appendChild(d);
       }
-    }
-
-    // Add "L-shaped" internal wall clusters (more ricochet-y)
-    const clusters = 18;
-    const dirs = ["T","R","B","L"];
-    for(let i=0;i<clusters;i++){
-      const x = 1 + Math.floor(seedRand()*(W-2));
-      const y = 1 + Math.floor(seedRand()*(H-2));
-      if((x===7||x===8) && (y===7||y===8)) { i--; continue; }
-
-      const d1 = dirs[Math.floor(seedRand()*dirs.length)];
-      const d2 = dirs[Math.floor(seedRand()*dirs.length)];
-      addWall(x,y,d1);
-      addWall(x,y,d2);
-
-      // a small offset wall to create corridors
-      const ox = Math.max(1, Math.min(W-2, x + (seedRand()>.5?1:-1)));
-      const oy = Math.max(1, Math.min(H-2, y + (seedRand()>.5?1:-1)));
-      if(!((ox===7||ox===8) && (oy===7||oy===8))){
-        addWall(ox,oy,dirs[Math.floor(seedRand()*dirs.length)]);
-      }
-    }
-
-    // A few straight walls to reduce "open fields"
-    const straights = 22;
-    for(let i=0;i<straights;i++){
-      const x = 1 + Math.floor(seedRand()*(W-2));
-      const y = 1 + Math.floor(seedRand()*(H-2));
-      if((x===7||x===8) && (y===7||y===8)) { i--; continue; }
-      addWall(x,y, seedRand()>.5 ? "R" : "B");
-    }
+    });
+    board.appendChild(c);
   }
+  movesEl.textContent=moves;
+}
 
-  // Targets
-  const symbols = ["◆","●","▲","■","★","✚","✦","⬟"];
-  let target = { robotId: 0, x: 10, y: 10, symbol: "★" };
-
-  function robotAt(x,y){ return robots.find(r => r.x===x && r.y===y); }
-  function hasWall(x,y,dir){
-    const m = {T:1,R:2,B:4,L:8}[dir];
-    return (walls[idx(x,y)] & m) !== 0;
+function move(dx,dy){
+  const r=robots[selected];
+  while(true){
+    const nx=r.x+dx,ny=r.y+dy;
+    if(nx<0||ny<0||nx>=W||ny>=H)break;
+    if(robots.some(o=>o!==r&&o.x===nx&&o.y===ny))break;
+    r.x=nx;r.y=ny;
   }
+  moves++;
+  render();
+}
 
-  function randomEmptyCell(){
-    while(true){
-      const x = Math.floor(Math.random()*W);
-      const y = Math.floor(Math.random()*H);
-      if((x===7||x===8) && (y===7||y===8)) continue;
-      if(robotAt(x,y)) continue;
-      return {x,y};
-    }
-  }
+document.addEventListener("keydown",e=>{
+  if(e.key==="ArrowUp")move(0,-1);
+  if(e.key==="ArrowDown")move(0,1);
+  if(e.key==="ArrowLeft")move(-1,0);
+  if(e.key==="ArrowRight")move(1,0);
+});
 
-  function newTarget(){
-    target.robotId = Math.floor(Math.random()*robots.length);
-    const c = randomEmptyCell();
-    target.x = c.x; target.y = c.y;
-    target.symbol = symbols[Math.floor(Math.random()*symbols.length)];
-    startNewTurn();
-    log("🎯 Nouvelle cible");
-  }
+function newTarget(){
+  target={x:Math.floor(Math.random()*W),y:Math.floor(Math.random()*H)};
+  moves=0;
+  render();
+}
 
-  // --- Turn state (undo/redo + logs) ---
-  let selectedId = 0;
-  let moves = 0;
-  let logLines = [];
+function reset(){
+  robots[0].x=1;robots[0].y=1;
+  robots[1].x=14;robots[1].y=1;
+  robots[2].x=1;robots[2].y=14;
+  robots[3].x=14;robots[3].y=14;
+  moves=0;
+  render();
+}
 
-  // Each state snapshot: robots positions + selectedId + moves + bid + win info
-  let undoStack = [];
-  let redoStack = [];
-
-  // Bid mode
-  let bidActive = false;
-  let bidValue = null;
-  let bidLockedMovesAtStart = 0; // moves baseline when bid started
-  const bidStatusEl = document.getElementById("bidStatus");
-
-  function snapshot(){
-    return {
-      robots: robots.map(r => ({x:r.x,y:r.y})),
-      selectedId,
-      moves,
-      bidActive,
-      bidValue,
-      bidLockedMovesAtStart
-    };
-  }
-
-  function restore(s){
-    robots.forEach((r,i)=>{ r.x=s.robots[i].x; r.y=s.robots[i].y; });
-    selectedId = s.selectedId;
-    moves = s.moves;
-    bidActive = s.bidActive;
-    bidValue = s.bidValue;
-    bidLockedMovesAtStart = s.bidLockedMovesAtStart;
-    updateUI();
-  }
-
-  function pushUndo(){
-    undoStack.push(snapshot());
-    if(undoStack.length>500) undoStack.shift();
-    redoStack = [];
-    updateUndoRedoButtons();
-  }
-
-  function undo(){
-    if(!undoStack.length) return;
-    redoStack.push(snapshot());
-    const s = undoStack.pop();
-    restore(s);
-    updateUndoRedoButtons();
-    log("↩️ Undo");
-  }
-
-  function redo(){
-    if(!redoStack.length) return;
-    undoStack.push(snapshot());
-    const s = redoStack.pop();
-    restore(s);
-    updateUndoRedoButtons();
-    log("↪️ Redo");
-  }
-
-  function updateUndoRedoButtons(){
-    document.getElementById("undo").disabled = undoStack.length===0;
-    document.getElementById("redo").disabled = redoStack.length===0;
-  }
-
-  function log(s){
-    logLines.push(s);
-    if(logLines.length>120) logLines.shift();
-    const logEl = document.getElementById("log");
-    logEl.textContent = logLines.join("\n");
-    logEl.scrollTop = logEl.scrollHeight;
-  }
-
-  function checkWin(){
-    const r = robots[target.robotId];
-    return r.x===target.x && r.y===target.y;
-  }
-
-  function evalBidStatus(){
-    if(!bidActive || bidValue==null){
-      bidStatusEl.textContent = "";
-      return;
-    }
-    const used = moves - bidLockedMovesAtStart;
-    const remaining = bidValue - used;
-    if(checkWin()){
-      if(used <= bidValue){
-        bidStatusEl.innerHTML = `<span class="ok">✅ Pari tenu : ${used}/${bidValue}</span>`;
-      } else {
-        bidStatusEl.innerHTML = `<span class="bad">❌ Pari raté : ${used}/${bidValue}</span>`;
-      }
-      bidActive = false;
-      return;
-    }
-    if(remaining >= 0){
-      bidStatusEl.innerHTML = `Pari en cours : ${used}/${bidValue} (reste ${remaining})`;
-    } else {
-      bidStatusEl.innerHTML = `<span class="bad">Pari dépassé : ${used}/${bidValue}</span>`;
-    }
-  }
-
-  // Slide movement
-  function slide(robot, dir){
-    let dx=0, dy=0;
-    if(dir==="L") dx=-1;
-    if(dir==="R") dx=1;
-    if(dir==="T") dy=-1;
-    if(dir==="B") dy=1;
-
-    let x=robot.x, y=robot.y;
-    if(hasWall(x,y,dir)) return false;
-
-    while(true){
-      const nx = x+dx, ny = y+dy;
-      if(hasWall(x,y,dir)) break;
-      if(robotAt(nx,ny)) break;
-      x = nx; y = ny;
-      if(!inBounds(x,y)) break;
-    }
-    if(x===robot.x && y===robot.y) return false;
-    robot.x = x; robot.y = y;
-    return true;
-  }
-
-  function doMove(dir){
-    const r = robots[selectedId];
-    const before = {x:r.x,y:r.y};
-    pushUndo(); // save state BEFORE moving
-    const ok = slide(r, dir);
-    if(!ok){
-      // rollback undo push if no move
-      undoStack.pop();
-      updateUndoRedoButtons();
-      return;
-    }
-    moves++;
-    const arrow = {L:"←",R:"→",T:"↑",B:"↓"}[dir];
-    log(`${r.short}${arrow}: (${before.x+1},${before.y+1}) -> (${r.x+1},${r.y+1})`);
-    updateUI();
-
-    if(checkWin()){
-      log(`🏁 Objectif atteint en ${moves} coups (tour) !`);
-    }
-    evalBidStatus();
-  }
-
-  // UI
-  const boardEl = document.getElementById("board");
-  const selNameEl = document.getElementById("selName");
-  const movesEl = document.getElementById("moves");
-  const targetLabelEl = document.getElementById("targetLabel");
-
-  function cellClasses(x,y){
-    const m = walls[idx(x,y)];
-    let cls = "cell";
-    if(((x+y)&1)===1) cls += " dark";
-    if(m&1) cls += " wallT";
-    if(m&2) cls += " wallR";
-    if(m&4) cls += " wallB";
-    if(m&8) cls += " wallL";
-    return cls;
-  }
-
-  function updateUI(){
-    selNameEl.textContent = robots[selectedId]?.name ?? "—";
-    movesEl.textContent = String(moves);
-
-    const tRobot = robots[target.robotId];
-    targetLabelEl.innerHTML = `
-      <span class="pill">
-        <span class="dot" style="background:${tRobot.color}"></span>
-        ${tRobot.name} ${target.symbol} @ (${target.x+1},${target.y+1})
-      </span>
-    `;
-
-    // Board render
-    boardEl.innerHTML = "";
-    for(let y=0;y<H;y++){
-      for(let x=0;x<W;x++){
-        const cell = document.createElement("div");
-        cell.className = cellClasses(x,y);
-
-        if(x===target.x && y===target.y){
-          const t = document.createElement("div");
-          t.className = "target";
-          t.textContent = target.symbol;
-          cell.appendChild(t);
-        }
-
-        const rob = robotAt(x,y);
-        if(rob){
-          const d = document.createElement("div");
-          d.className = "robot" + (rob.id===selectedId ? " sel":"");
-          d.style.background = rob.color;
-          d.textContent = rob.short;
-          d.title = rob.name + " (clic pour sélectionner)";
-          d.addEventListener("click", () => { selectedId = rob.id; updateUI(); });
-          cell.appendChild(d);
-        }
-
-        boardEl.appendChild(cell);
-      }
-    }
-    evalBidStatus();
-    updateUndoRedoButtons();
-  }
-
-  function resetRobotsToDefault(){
-    robots.forEach((r,i)=>{ r.x=defaultStarts[i].x; r.y=defaultStarts[i].y; });
-  }
-
-  function startNewTurn(){
-    // Reset turn state, but keep current layout + current target
-    resetRobotsToDefault();
-    moves = 0;
-    undoStack = [];
-    redoStack = [];
-    bidActive = false;
-    bidValue = null;
-    bidLockedMovesAtStart = 0;
-    logLines = [];
-    updateUI();
-  }
-
-  function shuffle(){
-    generateLayout();
-    newTarget();
-    log("🔁 Nouveau layout généré");
-  }
-
-  // Timer
-  let timerRunning = false;
-  let timerStartMs = 0;
-  let timerAccumMs = 0;
-  const clockEl = document.getElementById("clock");
-
-  function fmtClock(ms){
-    const total = Math.floor(ms/1000);
-    const m = String(Math.floor(total/60)).padStart(2,"0");
-    const s = String(total%60).padStart(2,"0");
-    return `${m}:${s}`;
-  }
-
-  function timerNowMs(){
-    if(!timerRunning) return timerAccumMs;
-    return timerAccumMs + (Date.now() - timerStartMs);
-  }
-
-  function timerToggle(){
-    if(timerRunning){
-      timerAccumMs = timerNowMs();
-      timerRunning = false;
-      log("⏸️ Chrono pause");
-    } else {
-      timerStartMs = Date.now();
-      timerRunning = true;
-      log("▶️ Chrono start");
-    }
-  }
-
-  function timerReset(){
-    timerRunning = false;
-    timerAccumMs = 0;
-    log("🧼 Chrono reset");
-  }
-
-  setInterval(() => { clockEl.textContent = fmtClock(timerNowMs()); }, 250);
-
-  // Bid
-  const bidInput = document.getElementById("bidInput");
-  document.getElementById("startBid").addEventListener("click", () => {
-    const v = Number(bidInput.value);
-    if(!Number.isFinite(v) || v<=0) return;
-    bidActive = true;
-    bidValue = Math.floor(v);
-    bidLockedMovesAtStart = moves;
-    bidStatusEl.innerHTML = `Pari démarré : ${bidValue} coups`;
-    log(`🎲 Pari annoncé : ${bidValue} coups`);
-    updateUI();
-  });
-
-  // Buttons
-  document.getElementById("newTarget").addEventListener("click", ()=> newTarget());
-  document.getElementById("resetTurn").addEventListener("click", ()=> { startNewTurn(); log("↩️ Reset tour"); });
-  document.getElementById("shuffle").addEventListener("click", ()=> shuffle());
-  document.getElementById("undo").addEventListener("click", ()=> undo());
-  document.getElementById("redo").addEventListener("click", ()=> redo());
-  document.getElementById("timerToggle").addEventListener("click", ()=> timerToggle());
-  document.getElementById("timerReset").addEventListener("click", ()=> timerReset());
-  document.getElementById("copyLog").addEventListener("click", async ()=> {
-    const text = logLines.join("\n");
-    try{
-      await navigator.clipboard.writeText(text);
-      log("📋 Log copié dans le presse-papier");
-    } catch {
-      log("⚠️ Impossible de copier (permissions navigateur)");
-    }
-  });
-
-  // Keyboard controls
-  document.addEventListener("keydown", (e) => {
-    const k = e.key;
-
-    if(k==="ArrowLeft")  { e.preventDefault(); doMove("L"); }
-    if(k==="ArrowRight") { e.preventDefault(); doMove("R"); }
-    if(k==="ArrowUp")    { e.preventDefault(); doMove("T"); }
-    if(k==="ArrowDown")  { e.preventDefault(); doMove("B"); }
-
-    if(k==="1") { selectedId=0; updateUI(); }
-    if(k==="2") { selectedId=1; updateUI(); }
-    if(k==="3") { selectedId=2; updateUI(); }
-    if(k==="4") { selectedId=3; updateUI(); }
-
-    if(k.toLowerCase()==="n") newTarget();
-    if(k.toLowerCase()==="r") { startNewTurn(); log("↩️ Reset tour"); }
-
-    // Undo/Redo shortcuts (simple)
-    if(k.toLowerCase()==="z" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); undo(); }
-    if(k.toLowerCase()==="y" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); redo(); }
-
-    // Quick undo/redo without ctrl (Z/Y) as well (as hinted)
-    if(!e.ctrlKey && !e.metaKey){
-      if(k.toLowerCase()==="z") undo();
-      if(k.toLowerCase()==="y") redo();
-    }
-  });
-
-  // Init
-  generateLayout();
-  newTarget();
-  updateUI();
-})();
+render();
 </script>
 </body>
 </html>
